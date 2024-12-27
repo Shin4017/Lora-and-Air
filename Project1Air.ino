@@ -18,7 +18,7 @@
 #define DHTTYPE DHT22  // Define the type of DHT sensor 
   // Dust Sensor PM2.5 GP2Y1010AU0F
 int dustPin=0;
-int ledPower=4;
+int ledPower=D4;
 int delayTime=280;
 int delayTime2=40;
 float offTime=9680; //10000-280-40
@@ -48,8 +48,9 @@ float recalculateHumidity(float temp, float rh)
 {
   // 温度を補正して湿度を再計算
   float temp2 = temp + TEMPERATURE_CORRECTION;
-  return rh * calcMaxVaperPressure(temp) * (temp2 + 273.15) /
-         ((temp + 273.15) * calcMaxVaperPressure(temp2));
+  //return rh * calcMaxVaperPressure(temp) * (temp2 + 273.15) /
+  //       ((temp + 273.15) * calcMaxVaperPressure(temp2));
+  return rh;
 }
 
 // Update these with values suitable for your network.
@@ -141,7 +142,7 @@ void setup() {
   pinMode(buzzerPin, OUTPUT);
   digitalWrite(BUILTIN_LED, HIGH);  // Turn the LED off by making the voltage HIGH
   digitalWrite(buzzerPin, HIGH);
-  Serial.begin(9600);  
+  Serial.begin(115200);  
   dht.begin();  
   pinMode(ledPower,OUTPUT);
   setup_wifi();
@@ -182,9 +183,9 @@ void loop() {
   /*//AHT21 Cảm biến
   float rawTemperature = AHT21.readTemperature();
   float rawHumidity = AHT21.readHumidity();
-  float t = rawTemperature + TEMPERATURE_CORRECTION;
-  float h = recalculateHumidity(rawTemperature, rawHumidity);
-  ENS160.setTempAndHum(t, h);*/
+  float temperature = rawTemperature + TEMPERATURE_CORRECTION;
+  float humidity = recalculateHumidity(rawTemperature, rawHumidity);
+  ENS160.setTempAndHum(temperature, humidity);*/
 
   // DHT Sensor
   float humidity = dht.readHumidity();  // Read humidity  
@@ -193,7 +194,8 @@ void loop() {
   if (isnan(humidity) || isnan(temperature)) {  
     Serial.println("Failed to read from DHT sensor!");  
     return;  
-  }  
+  } 
+  ENS160.setTempAndHum(temperature, humidity);
 
   // Dust Sensor PM2.5 GP2Y1010AU0F
   digitalWrite(ledPower,LOW); // power on the LED
@@ -204,6 +206,7 @@ void loop() {
   delayMicroseconds(offTime);
   
   voltage = dustVal*0.0049;//dustval*5/1024
+  //voltage = dustVal*(3.3/1024);
   dustdensity = 0.172*voltage-0.1;
   
   if (dustdensity < 0 )
@@ -211,10 +214,10 @@ void loop() {
   if (dustdensity > 0.5)
   dustdensity = 0.5;
   String dataString = "";
-  dataString += dtostrf(voltage, 9, 4, s);
-  dataString += "V,";
+  //dataString += dtostrf(voltage, 9, 4, s);
+  //dataString += "V,";
   dataString += dtostrf(dustdensity*1000.0, 5, 2, s);
-  dataString += "ug/m3";
+  //dataString += "ug/m3";
 
   //AQI, TVOC, ECO2 from ENS160
   gAQI = ENS160.getAQI();
@@ -228,7 +231,7 @@ void loop() {
   doc["aqi"] = gAQI;
   doc["voc"] = gTVOC;
   doc["co2"] = gECO2;
-  doc["dust"] = dataString; //Cảm biến bụi
+  doc["pm25"] = dataString; //Cảm biến bụi
   String msg ;
   serializeJson(doc,msg);
     Serial.print("Publish message: ");
